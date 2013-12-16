@@ -44,6 +44,17 @@ namespace Sep.Git.Tfs.VsCommon
             return _bridge.Wrap<WrapperForItem, Item>(itemSet.Items);
         }
 
+        public IItem[] GetMultipleFileItems(string[] itemPaths, int changesetNumber)
+        {
+            var itemsSets = _versionControlServer.GetItems(
+                itemPaths.Select(itemPath => new ItemSpec(itemPath, RecursionType.None)).ToArray(),
+                new ChangesetVersionSpec(changesetNumber),
+                DeletedState.Any,
+                ItemType.File,
+                true);
+            return itemsSets.SelectMany(its => _bridge.Wrap<WrapperForItem, Item>(its.Items)).ToArray();
+        }
+
         public IEnumerable<IChangeset> QueryHistory(string path, int version, int deletionId,
                                                     TfsRecursionType recursion, string user, int versionFrom, int versionTo, int maxCount,
                                                     bool includeChanges, bool slotMode, bool includeDownloadInfo)
@@ -85,6 +96,11 @@ namespace Sep.Git.Tfs.VsCommon
 
                 return committer;
             }
+        }
+
+        public int [] GetWorkItemsIds()
+        {
+            return _changeset.WorkItems.Select(wi => wi.Id).ToArray();
         }
 
         public DateTime CreationDate

@@ -130,10 +130,31 @@ namespace Sep.Git.Tfs.VsCommon
             } 
         }
 
-        public virtual int FindMergeChangesetParent(string path, long firstChangeset, GitTfsRemote remote)
+        public IEnumerable<ITfsChangeset> EnumerateChangesets(string path, IGitTfsRemote remote)
+        {
+            var changesets = VersionControl.QueryHistory(path, VersionSpec.Latest, 0, RecursionType.Full,
+                null, new ChangesetVersionSpec(1), VersionSpec.Latest, int.MaxValue, true, true, true, true)
+                .Cast<Changeset>().Select(cs => BuildTfsChangeset(cs, remote));
+
+            return changesets;
+        }
+
+        public virtual int FindMergeChangesetParent(string path, long firstChangeset)
         {
             var mergeInfo = VersionControl.QueryMerges(null, null, path, LatestVersionSpec.Latest, null, new ChangesetVersionSpec((int)firstChangeset), RecursionType.Full);
-            return mergeInfo.Max(x => x.SourceVersion);
+            
+            // Sometimes there is no merge info and the list is empty, so return -1 instead of crashing on sequence with no elements when running .Max()
+            return mergeInfo.Length > 0 ? mergeInfo.Max(x => x.SourceVersion) : -1;
+        }
+
+        public virtual Dictionary<int, int> GetBranchMerges(string path)
+        {
+            var mergeInfo = VersionControl.QueryMerges(null, null, path, LatestVersionSpec.Latest, null, null, RecursionType.Full);
+
+            var merges = mergeInfo.GroupBy(m => m.TargetVersion, m => m).Select(g => new { TargetId = g.Key, SourceId = g.Max(m => m.SourceVersion), }).
+                ToDictionary(e => e.TargetId, e => e.SourceId);
+
+            return merges;
         }
 
         public virtual bool CanGetBranchInformation { get { return false; } }
@@ -483,6 +504,11 @@ namespace Sep.Git.Tfs.VsCommon
             public string Committer
             {
                 get { return _pendingSet.OwnerName; }
+            }
+
+            public int[] GetWorkItemsIds()
+            {
+                return null;
             }
 
             public DateTime CreationDate

@@ -73,15 +73,25 @@ namespace Sep.Git.Tfs.VsFake
             return _script.Changesets
                 .Where(x => x.Id >= startVersion && x.Changes.Any(c => c.RepositoryPath.ToLower().IndexOf(path.ToLower()) == 0 || path.ToLower().IndexOf(c.RepositoryPath.ToLower()) == 0))
                 .Select(x => BuildTfsChangeset(x, remote));
+        }   
+        
+        public IEnumerable<ITfsChangeset> EnumerateChangesets(string path, IGitTfsRemote remote)
+        {
+            throw new NotImplementedException();
         }
 
-        public int FindMergeChangesetParent(string path, long firstChangeset, GitTfsRemote remote)
+        public int FindMergeChangesetParent(string path, long firstChangeset)
         {
             var firstChangesetOfBranch = _script.Changesets.FirstOrDefault(c => c.IsMergeChangeset && c.MergeChangesetDatas.MergeIntoBranch == path && c.MergeChangesetDatas.BeforeMergeChangesetId < firstChangeset);
             if (firstChangesetOfBranch != null)
                 return firstChangesetOfBranch.MergeChangesetDatas.BeforeMergeChangesetId;
             return -1;
 
+        }
+
+        public Dictionary<int, int> GetBranchMerges(string path)
+        {
+            throw new NotImplementedException();
         }
 
         private ITfsChangeset BuildTfsChangeset(ScriptedChangeset changeset, IGitTfsRemote remote)
@@ -110,6 +120,11 @@ namespace Sep.Git.Tfs.VsFake
             public string Committer
             {
                 get { return "todo"; }
+            }
+
+            public int[] GetWorkItemsIds()
+            {
+                return null;
             }
 
             public DateTime CreationDate

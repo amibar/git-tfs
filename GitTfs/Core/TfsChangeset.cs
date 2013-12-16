@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using LibGit2Sharp;
 using Sep.Git.Tfs.Core.TfsInterop;
 using Sep.Git.Tfs.Util;
 
@@ -11,6 +12,11 @@ namespace Sep.Git.Tfs.Core
 {
     public class TfsChangeset : ITfsChangeset
     {
+        public override string ToString()
+        {
+            return string.Format("ChangesetId: {0} (based on {1}){2}", _changeset.ChangesetId, BaseChangesetId, IsMergeChangeset ? " Merge" : "");
+        }
+
         private readonly ITfsHelper _tfs;
         private readonly IChangeset _changeset;
         private readonly TextWriter _stdout;
@@ -59,7 +65,7 @@ namespace Sep.Git.Tfs.Core
         {
             treeBuilder.Add(change.GitPath, workspace.GetLocalPath(change.GitPath), change.Mode);
         }
-
+        
         public IEnumerable<TfsTreeEntry> GetTree()
         {
             return GetFullTree().Where(item => item.Item.ItemType == TfsItemType.File && !Summary.Remote.ShouldSkip(item.FullName));
@@ -75,22 +81,54 @@ namespace Sep.Git.Tfs.Core
             }
         }
 
-        public IEnumerable<TfsTreeEntry> GetFullTree()
+        public IEnumerable<TfsTreeEntry> GetFullTree(string tfsRepositoryPath = null)
         {
+            if (tfsRepositoryPath == null)
+            {
+                tfsRepositoryPath = Summary.Remote.TfsRepositoryPath;
+            }
+
             var treeInfo = Summary.Remote.Repository.GetObjects();
-            var resolver = new PathResolver(Summary.Remote, treeInfo);
+            var resolver = tfsRepositoryPath == null ? new PathResolver(Summary.Remote, treeInfo) : new PathResolver(tfsRepositoryPath);
             
             IItem[] tfsItems;
-            if(Summary.Remote.TfsRepositoryPath != null)
+            if (tfsRepositoryPath != null)
             {
-                tfsItems = _changeset.VersionControlServer.GetItems(Summary.Remote.TfsRepositoryPath, _changeset.ChangesetId, TfsRecursionType.Full);   
+                tfsItems = _changeset.VersionControlServer.GetItems(tfsRepositoryPath, _changeset.ChangesetId, TfsRecursionType.Full);   
             }
             else
             {
                 tfsItems = Summary.Remote.TfsSubtreePaths.SelectMany(x => _changeset.VersionControlServer.GetItems(x, _changeset.ChangesetId, TfsRecursionType.Full)).ToArray();
             }
+            
             var tfsItemsWithGitPaths = tfsItems.Select(item => new { item, gitPath = resolver.GetPathInGitRepo(item.ServerItem) });
+
             return tfsItemsWithGitPaths.Where(x => x.gitPath != null).Select(x => new TfsTreeEntry(x.gitPath, x.item));
+        }
+
+        public IEnumerable<TfsTreeEntry> GetChangesTree(string tfsRepositoryPath)
+        {
+            var resolver = new PathResolver(tfsRepositoryPath);
+
+            IChange[] changes = _changeset.Changes;
+            IItem[] tfsItems = _changeset.VersionControlServer.GetMultipleFileItems(changes.Select(c => c.Item.ServerItem).ToArray(), _changeset.ChangesetId);
+
+            var mapItemIdToItem = tfsItems.ToDictionary(i => i.ItemId, i => i);
+
+            var tfsItemsWithGitPaths = changes.
+                Where(c => c.Item.ItemType == TfsItemType.File).
+                Select(c => new { Change = c, gitPath = resolver.GetPathInGitRepo(c.Item.ServerItem), }).ToArray();
+
+            var tfsTreeEntries = tfsItemsWithGitPaths.Where(e => e.gitPath != null).
+                Select(e => new TfsTreeEntry(e.gitPath, mapItemIdToItem.ContainsKey(e.Change.Item.ItemId) ? mapItemIdToItem[e.Change.Item.ItemId] : e.Change.Item, e.Change.ChangeType)).
+                ToArray();
+
+            return tfsTreeEntries;
+        }
+
+        public int[] GetWorkItemsIds()
+        {
+            return _changeset.GetWorkItemsIds();
         }
 
         public LogEntry CopyTree(IGitTreeModifier treeBuilder, ITfsWorkspace workspace)
@@ -139,7 +177,7 @@ namespace Sep.Git.Tfs.Core
             }
         }
 
-        private LogEntry MakeNewLogEntry()
+        public LogEntry MakeNewLogEntry()
         {
             return MakeNewLogEntry(_changeset, Summary.Remote);
         }

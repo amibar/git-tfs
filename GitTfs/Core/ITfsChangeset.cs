@@ -12,7 +12,7 @@ namespace Sep.Git.Tfs.Core
         /// <summary>
         /// Get all items (files and folders) in the source TFS repository.
         /// </summary>
-        IEnumerable<TfsTreeEntry> GetFullTree();
+        IEnumerable<TfsTreeEntry> GetFullTree(string tfsRepositoryPath = null);
 
         /// <summary>
         /// Get all files that git-tfs should copy from the source TFS repository. (skips folders and ignored files)

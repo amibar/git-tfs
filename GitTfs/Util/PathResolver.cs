@@ -9,6 +9,7 @@ namespace Sep.Git.Tfs.Util
     {
         IGitTfsRemote _remote;
         IDictionary<string, GitObject> _initialTree;
+        private string _tfsRepositoryPath;
 
         public PathResolver(IGitTfsRemote remote, IDictionary<string, GitObject> initialTree)
         {
@@ -16,8 +17,25 @@ namespace Sep.Git.Tfs.Util
             _initialTree = initialTree;
         }
 
+        public PathResolver(string tfsRepositoryPath)
+        {
+            _tfsRepositoryPath = tfsRepositoryPath;
+        }
+
         public string GetPathInGitRepo(string tfsPath)
         {
+            if (_tfsRepositoryPath != null)
+            {
+                if (tfsPath == null) return null;
+
+                if (!tfsPath.StartsWith(_tfsRepositoryPath, StringComparison.OrdinalIgnoreCase)) return null;
+
+                tfsPath = tfsPath.Substring(_tfsRepositoryPath.Length);
+
+                while (tfsPath.StartsWith("/"))
+                    tfsPath = tfsPath.Substring(1);
+                return tfsPath;
+            }
             return GetGitObject(tfsPath).Try(x => x.Path);
         }
 

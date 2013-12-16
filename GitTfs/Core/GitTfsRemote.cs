@@ -297,6 +297,19 @@ namespace Sep.Git.Tfs.Core
             return tfsPath;
         }
 
+        public static string GetPathInGitRepo(string tfsPath, string tfsRepositoryPath)
+        {
+            if (tfsPath == null) return null;
+
+            if (!tfsPath.StartsWith(tfsRepositoryPath, StringComparison.InvariantCultureIgnoreCase)) return null;
+
+            tfsPath = tfsPath.Substring(tfsRepositoryPath.Length);
+
+            while (tfsPath.StartsWith("/"))
+                tfsPath = tfsPath.Substring(1);
+            return tfsPath;
+        }
+
         public class FetchResult : IFetchResult
         {
             public bool IsSuccess { get; set; }
@@ -315,31 +328,41 @@ namespace Sep.Git.Tfs.Core
             var fetchResult = new FetchResult{IsSuccess = true};
             var fetchedChangesets = FetchChangesets().ToList();
             fetchResult.NewChangesetCount = fetchedChangesets.Count;
-            foreach (var changeset in fetchedChangesets)
+            for (int i = 0; i < fetchedChangesets.Count; i++)
             {
+                var changeset = fetchedChangesets[i];
+                AssertTemporaryIndexClean(MaxCommitHash);
                 var log = Apply(MaxCommitHash, changeset);
                 if (changeset.IsMergeChangeset)
                 {
-                    var parentChangesetId = Tfs.FindMergeChangesetParent(TfsRepositoryPath, changeset.Summary.ChangesetId, this);
-                    var shaParent = Repository.FindCommitHashByChangesetId(parentChangesetId);
-                    if (shaParent == null)
-                        shaParent = FindMergedRemoteAndFetch(parentChangesetId, stopOnFailMergeCommit);
-                    if (shaParent != null)
+                    var parentChangesetId = Tfs.FindMergeChangesetParent(TfsRepositoryPath, changeset.Summary.ChangesetId);
+                    if (parentChangesetId > 0)
                     {
-                        log.CommitParents.Add(shaParent);
+                        var shaParent = Repository.FindCommitHashByChangesetId(parentChangesetId);
+                        if (shaParent == null)
+                            shaParent = FindMergedRemoteAndFetch(parentChangesetId, stopOnFailMergeCommit);
+                        if (shaParent != null)
+                        {
+                            log.CommitParents.Add(shaParent);
+                        }
+                        else
+                        {
+                            if (stopOnFailMergeCommit)
+                            {
+                                fetchResult.IsSuccess = false;
+                                fetchResult.LastFetchedChangesetId = MaxChangesetId;
+                                return fetchResult;
+                            }
+                            //TODO : Manage case where there is not yet a git commit for the parent changset!!!!!
+                            stdout.WriteLine("warning: this changeset " + changeset.Summary.ChangesetId +
+                                             " is a merge changeset. But it can't have been managed accordingly because one of the parent changeset "
+                                             + parentChangesetId + " is not present in the repository! If you want to do it, fetch the branch containing this changeset before retrying...");
+                        }
                     }
                     else
                     {
-                        if (stopOnFailMergeCommit)
-                        {
-                            fetchResult.IsSuccess = false;
-                            fetchResult.LastFetchedChangesetId = MaxChangesetId;
-                            return fetchResult;
-                        }
-//TODO : Manage case where there is not yet a git commit for the parent changset!!!!!
                         stdout.WriteLine("warning: this changeset " + changeset.Summary.ChangesetId +
-                        " is a merge changeset. But it can't have been managed accordingly because one of the parent changeset "
-                        + parentChangesetId + " is not present in the repository! If you want to do it, fetch the branch containing this changeset before retrying...");
+                                         " is a merge changeset. But it can't have been managed accordingly because one of the parent changeset is not present in the TFS! Probably it was destoryed.");
                     }
                 }
                 if (changeset.Summary.ChangesetId == mergeChangesetId)
@@ -354,7 +377,7 @@ namespace Sep.Git.Tfs.Core
                 {
                     if (changeset.Summary.Workitems.Any())
                     {
-                        log.Log += "\nwork-items: " + string.Join(", ", changeset.Summary.Workitems.Select(wi => "#" + wi.Id)); ;
+                        log.Log += "\nwork-items: " + string.Join(", ", changeset.Summary.Workitems.Select(wi => "#" + wi.Id));
                     }
 
                     if (ExportWorkitemsMapping.Count != 0)
@@ -381,10 +404,10 @@ namespace Sep.Git.Tfs.Core
                 var commitSha = Commit(log);
                 UpdateTfsHead(commitSha, changeset.Summary.ChangesetId);
                 StringBuilder metadatas = new StringBuilder();
-                if(changeset.Summary.Workitems.Any())
+                if (changeset.Summary.Workitems.Any())
                 {
                     string workitemNote = "Workitems:\n";
-                    foreach(var workitem in changeset.Summary.Workitems)
+                    foreach (var workitem in changeset.Summary.Workitems)
                     {
                         var workitemId = workitem.Id.ToString();
                         var workitemUrl = workitem.Url;

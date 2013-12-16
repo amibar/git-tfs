@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Microsoft.TeamFoundation.Client;
 using Microsoft.TeamFoundation.VersionControl.Client;
 using Sep.Git.Tfs.Core;
@@ -32,10 +33,23 @@ namespace Sep.Git.Tfs.VsCommon
             }
         }
 
-        public override int FindMergeChangesetParent(string path, long firstChangeset, GitTfsRemote remote)
+        public override int FindMergeChangesetParent(string path, long firstChangeset)
         {
-            return VersionControl.QueryMerges(null, null, new ItemSpec(path, RecursionType.Full), LatestVersionSpec.Latest,
-              null, new ChangesetVersionSpec((int)firstChangeset)).Max(x => x.SourceVersion);
+            ChangesetMerge[] changesetMerges = VersionControl.QueryMerges(null, null, new ItemSpec(path, RecursionType.Full), LatestVersionSpec.Latest,
+                null, new ChangesetVersionSpec((int)firstChangeset));
+
+            // Sometimes there is no merge info and the list is empty, so return -1 instead of crashing on sequence with no elements when running .Max()
+            return changesetMerges.Length > 0 ? changesetMerges.Max(x => x.SourceVersion) : -1;
+        }
+
+        public override Dictionary<int, int> GetBranchMerges(string path)
+        {
+            ChangesetMerge[] changesetMerges = VersionControl.QueryMerges(null, null, new ItemSpec(path, RecursionType.Full), LatestVersionSpec.Latest, null, null);
+
+            var merges = changesetMerges.GroupBy(m => m.TargetVersion, m => m).Select(g => new { TargetId = g.Key, SourceId = g.Max(m => m.SourceVersion), }).
+                ToDictionary(e => e.TargetId, e => e.SourceId);
+
+            return merges;
         }
 
         public override IEnumerable<string> GetAllTfsRootBranchesOrderedByCreation()
@@ -82,23 +96,38 @@ namespace Sep.Git.Tfs.VsCommon
                 tfsPathParentBranch = tfsBranchToCreate.Properties.ParentBranch.Item;
                 Trace.WriteLine("Found parent branch : " + tfsPathParentBranch);
 
-                var firstChangesetInBranchToCreate = VersionControl.QueryHistory(tfsPathBranchToCreate, VersionSpec.Latest, 0, RecursionType.Full,
-                    null, null, null, int.MaxValue, true, false, false).Cast<Changeset>().LastOrDefault();
+                var changesets = VersionControl.QueryHistory(tfsPathBranchToCreate, VersionSpec.Latest, 0, RecursionType.Full,
+                    null, null, null, int.MaxValue, true, false, false).Cast<Changeset>().ToList();
 
-                if (firstChangesetInBranchToCreate == null)
+                ExtendedMerge[] extendedMerges = null;
+
+                // Iterate over the changesets in reverse order and find the root changeset of the branch.
+                // The loop is necessary because if a branch is created and then deleted and then created 
+                // again, without the loop we cannot find the correct first changeset. (Yes, I have this case)
+                for (int i = changesets.Count - 1; i >= 0; i--)
                 {
-                    throw new GitTfsException("An unexpected error occured when trying to find the root changeset.\nFailed to find first changeset for " + tfsPathBranchToCreate);
+                    var firstChangesetInBranchToCreate = changesets[i];
+
+                    if (firstChangesetInBranchToCreate == null)
+                    {
+                        throw new GitTfsException("An unexpected error occured when trying to find the root changeset.\nFailed to find first changeset for " + tfsPathBranchToCreate);
+                    }
+
+                    extendedMerges = VersionControl
+                        .TrackMerges(new int[] { firstChangesetInBranchToCreate.ChangesetId },
+                            new ItemIdentifier(tfsPathBranchToCreate),
+                            new ItemIdentifier[] { new ItemIdentifier(tfsPathParentBranch), },
+                            null);
+
+                    if (extendedMerges != null && extendedMerges.Length > 0)
+                    {
+                        break;
+                    }
                 }
 
-                var mergedItemsToFirstChangesetInBranchToCreate = VersionControl
-                    .TrackMerges(new int[] {firstChangesetInBranchToCreate.ChangesetId},
-                                 new ItemIdentifier(tfsPathBranchToCreate),
-                                 new ItemIdentifier[] {new ItemIdentifier(tfsPathParentBranch),},
-                                 null)
-                    .OrderBy(x => x.SourceChangeset.ChangesetId);
+                var mergedItemsToFirstChangesetInBranchToCreate = extendedMerges.OrderBy(x => x.SourceChangeset.ChangesetId);
 
-                var rootChangesetInParentBranch =
-                    GetRelevantChangesetBasedOnChangeType(mergedItemsToFirstChangesetInBranchToCreate, tfsPathParentBranch, tfsPathBranchToCreate);
+                var rootChangesetInParentBranch = GetRelevantChangesetBasedOnChangeType(mergedItemsToFirstChangesetInBranchToCreate, tfsPathParentBranch, tfsPathBranchToCreate);
 
                 return rootChangesetInParentBranch.ChangesetId;
             }

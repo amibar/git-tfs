@@ -35,7 +35,7 @@ namespace Sep.Git.Tfs.Core.TfsInterop
         void CreateBranch(string sourcePath, string targetPath, int changesetId, string comment = null);
         void CreateTfsRootBranch(string projectName, string mainBranch, string gitRepositoryPath, bool createTeamProjectFolder);
         bool IsExistingInTfs(string path);
-        int FindMergeChangesetParent(string path, long firstChangeset, GitTfsRemote remote);
+        int FindMergeChangesetParent(string path, long firstChangeset);
         /// <summary>
         /// Creates and maps a workspace for the given remote with the given local -> server directory mappings, at the given Tfs version,
         /// and then performs the action.
@@ -46,5 +46,14 @@ namespace Sep.Git.Tfs.Core.TfsInterop
         /// <param name="versionToFetch">The TFS version to fetch from the server</param>
         /// <param name="action">The action to perform</param>
         void WithWorkspace(string localDirectory, IGitTfsRemote remote, IEnumerable<Tuple<string, string>> mappings, TfsChangesetInfo versionToFetch, Action<ITfsWorkspace> action);
+
+        /// <summary>
+        /// Enumerate the changesets.
+        /// Helpful to get the first changeset faster if a work is done on each changeset which take some time.
+        /// </summary>
+        IEnumerable<ITfsChangeset> EnumerateChangesets(string path, IGitTfsRemote remote);
+
+        Dictionary<int, int> GetBranchMerges(string path);
+
     }
 }
