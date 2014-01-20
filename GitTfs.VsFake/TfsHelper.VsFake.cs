@@ -122,9 +122,9 @@ namespace Sep.Git.Tfs.VsFake
                 get { return "todo"; }
             }
 
-            public int[] GetWorkItemsIds()
+            public int[] WorkItemsIds
             {
-                return null;
+                get { return null; }
             }
 
             public DateTime CreationDate
@@ -394,12 +394,12 @@ namespace Sep.Git.Tfs.VsFake
             return new Changeset(_versionControlServer, _script.Changesets.First(c => c.Id == changesetId));
         }
 
-        public int GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
+        public BranchingChangesets GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
         {
             var firstChangesetOfBranch = _script.Changesets.FirstOrDefault(c => c.IsBranchChangeset && c.BranchChangesetDatas.BranchPath == tfsPathBranchToCreate);
             if (firstChangesetOfBranch != null)
-                return firstChangesetOfBranch.BranchChangesetDatas.RootChangesetId;
-            return -1;
+                return new BranchingChangesets(firstChangesetOfBranch.BranchChangesetDatas.RootChangesetId);
+            return new BranchingChangesets(-1);
         }
 
         public IEnumerable<IBranchObject> GetBranches()
@@ -511,6 +511,12 @@ namespace Sep.Git.Tfs.VsFake
             {
                 throw new NotImplementedException();
             }
+
+            public IItem[] GetMultipleFileItems(string[] itemPaths, int changesetNumber)
+            {
+                throw new NotImplementedException();
+            }
+
         }
     }
 }

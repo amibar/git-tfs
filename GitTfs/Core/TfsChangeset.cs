@@ -116,7 +116,6 @@ namespace Sep.Git.Tfs.Core
             var mapItemIdToItem = tfsItems.ToDictionary(i => i.ItemId, i => i);
 
             var tfsItemsWithGitPaths = changes.
-                Where(c => c.Item.ItemType == TfsItemType.File).
                 Select(c => new { Change = c, gitPath = resolver.GetPathInGitRepo(c.Item.ServerItem), }).ToArray();
 
             var tfsTreeEntries = tfsItemsWithGitPaths.Where(e => e.gitPath != null).
@@ -126,9 +125,9 @@ namespace Sep.Git.Tfs.Core
             return tfsTreeEntries;
         }
 
-        public int[] GetWorkItemsIds()
+        public int[] WorkItemsIds
         {
-            return _changeset.GetWorkItemsIds();
+            get { return _changeset.WorkItemsIds; }
         }
 
         public LogEntry CopyTree(IGitTreeModifier treeBuilder, ITfsWorkspace workspace)

@@ -26,7 +26,7 @@ namespace Sep.Git.Tfs.Core.TfsInterop
         bool CanShowCheckinDialog { get; }
         long ShowCheckinDialog(IWorkspace workspace, IPendingChange[] pendingChanges, IEnumerable<IWorkItemCheckedInfo> checkedInfos, string checkinComment);
         void CleanupWorkspaces(string workingDirectory);
-        int GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null);
+        BranchingChangesets GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null);
         IEnumerable<TfsLabel> GetLabels(string tfsPathBranch, string nameFilter = null);
         bool CanGetBranchInformation { get; }
         IEnumerable<string> GetAllTfsRootBranchesOrderedByCreation();
@@ -56,4 +56,23 @@ namespace Sep.Git.Tfs.Core.TfsInterop
         Dictionary<int, int> GetBranchMerges(string path);
 
     }
+
+    public struct BranchingChangesets
+    {
+        public readonly int SourceChangesetId;
+        public readonly int TargetChangesetId;
+
+        public BranchingChangesets(int sourceChangesetId)
+        {
+            SourceChangesetId = sourceChangesetId;
+            TargetChangesetId = 0;
+        }
+
+        public BranchingChangesets(int sourceChangesetId, int targetChangesetId)
+        {
+            SourceChangesetId = sourceChangesetId;
+            TargetChangesetId = targetChangesetId;
+        }
+    }
+
 }

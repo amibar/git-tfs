@@ -169,7 +169,7 @@ namespace Sep.Git.Tfs.VsCommon
             throw new NotImplementedException();
         }
 
-        public virtual int GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
+        public virtual BranchingChangesets GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
         {
             Trace.WriteLine("TFS 2008 Compatible mode!");
             int firstChangesetIdOfParentBranch = 1;
@@ -182,9 +182,11 @@ namespace Sep.Git.Tfs.VsCommon
             if (changesetIdsFirstChangesetInMainBranch == 0)
             {
                 Trace.WriteLine("No changeset in main branch since branch done... (need only to find the last changeset in the main branch)");
-                return VersionControl.QueryHistory(tfsPathParentBranch, VersionSpec.Latest, 0,
+                int sourceChangesetId = VersionControl.QueryHistory(tfsPathParentBranch, VersionSpec.Latest, 0,
                         RecursionType.Full, null, new ChangesetVersionSpec(firstChangesetIdOfParentBranch), VersionSpec.Latest,
                         1, false, false).Cast<Changeset>().First().ChangesetId;
+
+                return new BranchingChangesets(sourceChangesetId);
             }
 
             Trace.WriteLine("First changeset in the main branch after branching : " + changesetIdsFirstChangesetInMainBranch);
@@ -201,7 +203,7 @@ namespace Sep.Git.Tfs.VsCommon
                                 null, new ChangesetVersionSpec(lowerBound), new ChangesetVersionSpec(upperBound), int.MaxValue, true,
                                 false, false).Cast<Changeset>().Select(c => c.ChangesetId).ToList();
                 if (firstBranchChangesetIds.Count != 0)
-                    return firstBranchChangesetIds.First(cId => cId < changesetIdsFirstChangesetInMainBranch);
+                    return new BranchingChangesets(firstBranchChangesetIds.First(cId => cId < changesetIdsFirstChangesetInMainBranch));
                 else
                 {
                     if (upperBound == 1)
@@ -506,9 +508,9 @@ namespace Sep.Git.Tfs.VsCommon
                 get { return _pendingSet.OwnerName; }
             }
 
-            public int[] GetWorkItemsIds()
+            public int[] WorkItemsIds
             {
-                return null;
+                get { return null; }
             }
 
             public DateTime CreationDate

@@ -98,9 +98,9 @@ namespace Sep.Git.Tfs.VsCommon
             }
         }
 
-        public int [] GetWorkItemsIds()
+        public int [] WorkItemsIds
         {
-            return _changeset.WorkItems.Select(wi => wi.Id).ToArray();
+            get { return _changeset.WorkItems.Select(wi => wi.Id).ToArray(); }
         }
 
         public DateTime CreationDate

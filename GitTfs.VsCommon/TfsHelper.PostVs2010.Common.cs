@@ -66,7 +66,7 @@ namespace Sep.Git.Tfs.VsCommon
             return _bridge.Wrap<WrapperForBranchObject, BranchObject>(branches);
         }
 
-        public override int GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
+        public override BranchingChangesets GetRootChangesetForBranch(string tfsPathBranchToCreate, string tfsPathParentBranch = null)
         {
             try
             {
@@ -100,13 +100,14 @@ namespace Sep.Git.Tfs.VsCommon
                     null, null, null, int.MaxValue, true, false, false).Cast<Changeset>().ToList();
 
                 ExtendedMerge[] extendedMerges = null;
+                Changeset firstChangesetInBranchToCreate = null;
 
                 // Iterate over the changesets in reverse order and find the root changeset of the branch.
                 // The loop is necessary because if a branch is created and then deleted and then created 
                 // again, without the loop we cannot find the correct first changeset. (Yes, I have this case)
                 for (int i = changesets.Count - 1; i >= 0; i--)
                 {
-                    var firstChangesetInBranchToCreate = changesets[i];
+                    firstChangesetInBranchToCreate = changesets[i];
 
                     if (firstChangesetInBranchToCreate == null)
                     {
@@ -129,7 +130,7 @@ namespace Sep.Git.Tfs.VsCommon
 
                 var rootChangesetInParentBranch = GetRelevantChangesetBasedOnChangeType(mergedItemsToFirstChangesetInBranchToCreate, tfsPathParentBranch, tfsPathBranchToCreate);
 
-                return rootChangesetInParentBranch.ChangesetId;
+                return new BranchingChangesets(rootChangesetInParentBranch.ChangesetId, firstChangesetInBranchToCreate.ChangesetId);
             }
             catch (FeatureNotSupportedException ex)
             {

@@ -331,7 +331,6 @@ namespace Sep.Git.Tfs.Core
             for (int i = 0; i < fetchedChangesets.Count; i++)
             {
                 var changeset = fetchedChangesets[i];
-                AssertTemporaryIndexClean(MaxCommitHash);
                 var log = Apply(MaxCommitHash, changeset);
                 if (changeset.IsMergeChangeset)
                 {

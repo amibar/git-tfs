@@ -54,6 +54,7 @@ namespace Sep.Git.Tfs.Test.Core
                 public DateTime CreationDate { get; set; }
                 public string Committer { get; set; }
                 public IChange[] Changes { get; set; }
+                public int[] WorkItemsIds { get; set; }
             }
 
             private IGitTfsRemote _remote;
@@ -263,6 +264,11 @@ namespace Sep.Git.Tfs.Test.Core
             }
 
             IItem[] IVersionControlServer.GetItems(string itemPath, int changesetNumber, TfsRecursionType recursionType)
+            {
+                throw new NotImplementedException();
+            }
+
+            public IItem[] GetMultipleFileItems(string[] itemPaths, int changesetNumber)
             {
                 throw new NotImplementedException();
             }
